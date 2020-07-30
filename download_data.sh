@@ -14,8 +14,8 @@ done
 wget http://s3.amazonaws.com/proteindata/data_pytorch/pfam.model
 wget http://s3.amazonaws.com/proteindata/data_pytorch/pfam.vocab
 
-mv pfam.model data
-mv pfam.vocab data
+mv pfam.model data/
+mv pfam.vocab data/
 
 # Download Data Files
 wget http://s3.amazonaws.com/proteindata/data_pytorch/secondary_structure.tar.gz
