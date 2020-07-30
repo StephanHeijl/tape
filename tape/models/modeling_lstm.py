@@ -220,7 +220,13 @@ class ProteinLSTMForValuePrediction(ProteinLSTMAbstractModel):
 
     def forward(self, input_ids, input_mask=None, targets=None):
 
-        outputs = self.lstm(input_ids, input_mask=input_mask)
+        try:
+            outputs = self.lstm(input_ids, input_mask=input_mask)
+        except RuntimeError as e:
+            print(input_ids)
+            print(input_ids.shape)
+            raise e
+
 
         sequence_output, pooled_output = outputs[:2]
         outputs = self.predict(pooled_output, targets) + outputs[2:]
@@ -229,6 +235,7 @@ class ProteinLSTMForValuePrediction(ProteinLSTMAbstractModel):
 
 
 @registry.register_task_model('remote_homology', 'lstm')
+@registry.register_task_model('melting_point_classification', 'lstm')
 class ProteinLSTMForSequenceClassification(ProteinLSTMAbstractModel):
 
     def __init__(self, config):

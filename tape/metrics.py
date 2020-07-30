@@ -1,8 +1,17 @@
 from typing import Sequence, Union
 import numpy as np
 import scipy.stats
+from sklearn.metrics import matthews_corrcoef
 
 from .registry import registry
+
+
+@registry.register_metric('mcc')
+def mean_squared_error(target: Sequence[float],
+                       prediction: Sequence[float]) -> float:
+    target_array = np.asarray(target)
+    prediction_array = np.asarray(prediction)
+    return matthews_corrcoef(target_array, prediction_array)
 
 
 @registry.register_metric('mse')

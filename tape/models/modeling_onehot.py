@@ -71,6 +71,7 @@ class ProteinOneHotModel(ProteinOneHotAbstractModel):
 
 @registry.register_task_model('fluorescence', 'onehot')
 @registry.register_task_model('stability', 'onehot')
+@registry.register_task_model('melting_point_regression', 'onehot')
 class ProteinOneHotForValuePrediction(ProteinOneHotAbstractModel):
 
     def __init__(self, config):
@@ -92,12 +93,14 @@ class ProteinOneHotForValuePrediction(ProteinOneHotAbstractModel):
 
 
 @registry.register_task_model('remote_homology', 'onehot')
+@registry.register_task_model('melting_point_classification', 'onehot')
 class ProteinOneHotForSequenceClassification(ProteinOneHotAbstractModel):
 
     def __init__(self, config):
         super().__init__(config)
-
+        print(config)
         self.onehot = ProteinOneHotModel(config)
+
         self.classify = SequenceClassificationHead(config.vocab_size, config.num_labels)
 
         self.init_weights()
