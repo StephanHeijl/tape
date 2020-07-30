@@ -7,7 +7,7 @@ while true; do
 	    [Yy]* ) wget http://s3.amazonaws.com/proteindata/data_pytorch/pfam.tar.gz; tar -xzf pfam.tar.gz -C ./data; rm pfam.tar.gz; break;;
             [Nn]* ) exit;;
 	    * ) echo "Please answer yes (Y/y) or no (N/n).";;
-    esac
+     esac
 done
 
 # Download Vocab/Model files

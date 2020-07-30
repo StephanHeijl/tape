@@ -844,3 +844,47 @@ class TRRosettaDataset(Dataset):
             f2d_dca = torch.cat([features, contacts[:, :, None]], axis=2)
 
         return f2d_dca
+
+
+@registry.register_task('embed')
+class MeltingDataset(Dataset):
+    """ Defines the protein melting point prediction dataset.
+
+        Args:
+            data_path (Union[str, Path]): Path to tape data directory. By default, this is
+                assumed to be `./data`. Can be altered on the command line with the --data_dir
+                flag.
+            split (str): The specific dataset split to load often <train, valid, test>. In the
+                case of secondary structure, there are three test datasets so each of these
+                has a separate split flag.
+            tokenizer (str): The model tokenizer to use when returning tokenized indices.
+            in_memory (bool): Whether to load the entire dataset into memory or to keep
+                it on disk.
+        """
+
+    def __init__(self,
+                 data_file: Union[str, Path],
+                 tokenizer: Union[str, TAPETokenizer] = 'iupac',
+                 in_memory: bool = False):
+        super().__init__()
+
+        if isinstance(tokenizer, str):
+            tokenizer = TAPETokenizer(vocab=tokenizer)
+        self.tokenizer = tokenizer
+        self.data = dataset_factory(data_file)
+
+    def __len__(self) -> int:
+        return len(self.data)
+
+    def __getitem__(self, index: int):
+        item = self.data[index]
+        token_ids = self.tokenizer.encode(item['primary'])
+        input_mask = np.ones_like(token_ids)
+        return item['id'], token_ids, input_mask
+
+    def collate_fn(self, batch: List[Tuple[Any, ...]]) -> Dict[str, torch.Tensor]:
+        ids, tokens, input_mask = zip(*batch)
+        ids = list(ids)
+        tokens = torch.from_numpy(pad_sequences(tokens))
+        input_mask = torch.from_numpy(pad_sequences(input_mask))
+        return {'ids': ids, 'input_ids': tokens, 'input_mask': input_mask}  # type: ignore
