@@ -208,6 +208,7 @@ class ProteinLSTMForLM(ProteinLSTMAbstractModel):
 
 @registry.register_task_model('fluorescence', 'lstm')
 @registry.register_task_model('stability', 'lstm')
+@registry.register_task_model('melting_point_regression', 'lstm')
 class ProteinLSTMForValuePrediction(ProteinLSTMAbstractModel):
 
     def __init__(self, config):
@@ -249,7 +250,12 @@ class ProteinLSTMForSequenceClassification(ProteinLSTMAbstractModel):
 
     def forward(self, input_ids, input_mask=None, targets=None):
 
-        outputs = self.lstm(input_ids, input_mask=input_mask)
+        try:
+            outputs = self.lstm(input_ids, input_mask=input_mask)
+        except RuntimeError as e:
+            print(input_ids)
+            print(input_ids.shape)
+            raise e
 
         sequence_output, pooled_output = outputs[:2]
         outputs = self.classify(pooled_output, targets) + outputs[2:]

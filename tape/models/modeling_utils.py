@@ -629,6 +629,15 @@ def accuracy(logits, labels, ignore_index: int = -100):
         return correct.sum().float() / valid_mask.sum().float()
 
 
+def pearsonr(predictions, targets):
+    with torch.no_grad():
+        p_dm = (predictions - predictions.mean())
+        t_dm = (targets - targets.mean())
+        num = (p_dm * t_dm).sum()
+        denom = ((p_dm ** 2).sum() ** 0.5) * ((t_dm ** 2).sum() ** 0.5)
+        return num / (denom + 1e-6)
+
+
 def gelu(x):
     """Implementation of the gelu activation function.
         For information: OpenAI GPT's gelu is slightly different
@@ -791,7 +800,10 @@ class ValuePredictionHead(nn.Module):
         if targets is not None:
             loss_fct = nn.MSELoss()
             value_pred_loss = loss_fct(value_pred, targets)
-            outputs = (value_pred_loss,) + outputs
+            # You need a batch size that exceeds 1 or it will always be 0.
+            metrics = {'pearsonr': pearsonr(value_pred, targets)}
+            loss_and_metrics = (value_pred_loss, metrics)
+            outputs = (loss_and_metrics, ) + outputs
         return outputs  # (loss), value_prediction
 
 

@@ -894,7 +894,8 @@ class MeltingDatasetRegression(Dataset):
         ids = list(ids)
         tokens = torch.from_numpy(pad_sequences(tokens))
         input_mask = torch.from_numpy(pad_sequences(input_mask))
-        targets = torch.FloatTensor(targets)
+        # Make sure that the targets are shaped somewhat like a gaussian
+        targets = torch.FloatTensor((np.log(targets) - 3.7) / 0.2).view(-1, 1)
         return {'ids': ids, 'input_ids': tokens,
                 'input_mask': input_mask, 'targets': targets}  # type: ignore
 
@@ -928,6 +929,7 @@ class MeltingDatasetClassification(Dataset):
 
         if isinstance(tokenizer, str):
             tokenizer = TAPETokenizer(vocab=tokenizer)
+
         self.tokenizer = tokenizer
         self.data = dataset_factory(data_file)
 
@@ -946,7 +948,7 @@ class MeltingDatasetClassification(Dataset):
         ids = list(ids)
         tokens = torch.from_numpy(pad_sequences(tokens))
         input_mask = torch.from_numpy(pad_sequences(input_mask))
-        targets = pd.cut(targets, np.arange(0, 100, 5))
+        targets = pd.cut(targets, np.arange(0, 101, 5))
         targets = np.argmax(pd.get_dummies(targets).values, axis=1)
         targets = torch.LongTensor(targets)
         #print(targets.shape)

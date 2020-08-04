@@ -270,6 +270,7 @@ class ProteinResNetForMaskedLM(ProteinResNetAbstractModel):
 
 @registry.register_task_model('fluorescence', 'resnet')
 @registry.register_task_model('stability', 'resnet')
+@registry.register_task_model('melting_point_regression', 'resnet')
 class ProteinResNetForValuePrediction(ProteinResNetAbstractModel):
 
     def __init__(self, config):
@@ -291,6 +292,7 @@ class ProteinResNetForValuePrediction(ProteinResNetAbstractModel):
 
 
 @registry.register_task_model('remote_homology', 'resnet')
+@registry.register_task_model('melting_point_classification', 'resnet')
 class ProteinResNetForSequenceClassification(ProteinResNetAbstractModel):
 
     def __init__(self, config):

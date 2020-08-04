@@ -185,6 +185,7 @@ class UniRepForLM(UniRepAbstractModel):
 
 @registry.register_task_model('fluorescence', 'unirep')
 @registry.register_task_model('stability', 'unirep')
+@registry.register_task_model('melting_point_regression', 'unirep')
 class UniRepForValuePrediction(UniRepAbstractModel):
 
     def __init__(self, config):
@@ -206,6 +207,7 @@ class UniRepForValuePrediction(UniRepAbstractModel):
 
 
 @registry.register_task_model('remote_homology', 'unirep')
+@registry.register_task_model('melting_point_classification', 'unirep')
 class UniRepForSequenceClassification(UniRepAbstractModel):
 
     def __init__(self, config):
