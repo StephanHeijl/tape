@@ -951,6 +951,6 @@ class MeltingDatasetClassification(Dataset):
         targets = pd.cut(targets, np.arange(0, 101, 5))
         targets = np.argmax(pd.get_dummies(targets).values, axis=1)
         targets = torch.LongTensor(targets)
-        #print(targets.shape)
+
         return {'ids': ids, 'input_ids': tokens,
                 'input_mask': input_mask, 'targets': targets}  # type: ignore

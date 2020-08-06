@@ -1,0 +1,4 @@
+{
+  "sequence_chunking_size": 96,
+  "sequence_chunking_method": "mean"
+}

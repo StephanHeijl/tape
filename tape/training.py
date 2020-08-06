@@ -377,8 +377,14 @@ def run_eval_epoch(eval_loader: DataLoader,
         loss, metrics, outputs = runner.forward(batch, return_outputs=True)  # type: ignore
         predictions = outputs[1].cpu().numpy()
         targets = batch['targets'].cpu().numpy()
-        for pred, target in zip(predictions, targets):
-            save_outputs.append({'prediction': pred, 'target': target})
+        try:
+            ids = batch['ids']
+        except Exception as e:
+            ids = []
+            raise e
+
+        for pred, target, id in zip(predictions, targets, ids):
+            save_outputs.append({'prediction': pred, 'target': target, 'id': id})
 
     return save_outputs
 
