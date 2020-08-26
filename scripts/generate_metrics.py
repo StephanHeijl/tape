@@ -64,14 +64,17 @@ TAPE_EVAL = "/home/sheijl/.local/bin/tape-eval"
 models = pandas.read_csv("/home/sheijl/Documents/models.csv").dropna()
 
 
-def main():
-    real_valid_values = load_real_values(os.path.join(TAPE_DIR, "data/melting_temps/varibench_test.lmdb"))
+def main(split="test"):
+    real_valid_values = load_real_values(os.path.join(TAPE_DIR, "data/melting_temps/%s.lmdb" % split))
 
     # Generate varibench test results
     command = "cd {tape_dir}; {tape_eval} {model_type} melting_point_{prediction_type} bert_melting_point_regr/{run_name} " \
-              "--tokenizer {tokenizer} --split varibench_test --batch_size 1 --num_workers 0"
+              "--tokenizer {tokenizer} --split %s --batch_size 1 --num_workers 0" % split
 
     for r, row in models.iterrows():
+        if row.identity != 90:
+            continue
+
         if not os.path.exists(os.path.join(TAPE_DIR, "bert_melting_point_regr", row.run_name, "pytorch_model.bin")):
             print(f"Run name {row.run_name} not available.")
             continue
@@ -109,7 +112,7 @@ def main():
         out.update(results_dict)
         del out["run_name"]
 
-        with open("results.jsonl", "a+") as f:
+        with open("results_test.jsonl", "a+") as f:
             f.write(json.dumps(out) + "\n")
 
 

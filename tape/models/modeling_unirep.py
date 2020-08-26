@@ -33,6 +33,7 @@ class UniRepConfig(ProteinConfig):
                  initializer_range: float = 0.02,
                  sequence_chunking_size: float = 0,
                  sequence_chunking_method: str = None,
+                 trainable_encoder: bool = True,
                  **kwargs):
         super().__init__(**kwargs)
         self.vocab_size = vocab_size
@@ -43,6 +44,7 @@ class UniRepConfig(ProteinConfig):
         self.initializer_range = initializer_range
         self.sequence_chunking_size = sequence_chunking_size
         self.sequence_chunking_method = sequence_chunking_method
+        self.trainable_encoder = trainable_encoder
 
 
 class mLSTMCell(nn.Module):
@@ -131,6 +133,7 @@ class UniRepModel(UniRepAbstractModel):
         self.encoder = mLSTM(config)
         self.output_hidden_states = config.output_hidden_states
         self.sequence_chunking_size = config.sequence_chunking_size
+        self.trainable_encoder = config.trainable_encoder
 
         methods = {
             "sum": torch.sum,
@@ -139,7 +142,6 @@ class UniRepModel(UniRepAbstractModel):
         }
 
         self.sequence_chunking_method = methods[config.sequence_chunking_method]
-
         self.init_weights()
 
     def chunk_sequence(self, embedding_output, input_mask):
@@ -261,6 +263,10 @@ class UniRepForValuePrediction(UniRepAbstractModel):
         super().__init__(config)
 
         self.unirep = UniRepModel(config)
+        if not config.trainable_encoder:
+            for param in self.unirep.parameters():
+                param.requires_grad = False
+
         self.predict = ValuePredictionHead(config.hidden_size * 2)
 
         self.init_weights()
@@ -282,6 +288,9 @@ class UniRepForSequenceClassification(UniRepAbstractModel):
         super().__init__(config)
 
         self.unirep = UniRepModel(config)
+        if not config.trainable_encoder:
+            for param in self.unirep.parameters():
+                param.requires_grad = False
         self.classify = SequenceClassificationHead(
             config.hidden_size * 2, config.num_labels)
 

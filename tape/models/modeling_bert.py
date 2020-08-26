@@ -532,6 +532,12 @@ class ProteinBertForSequenceClassification(ProteinBertAbstractModel):
         self.classify = SequenceClassificationHead(
             config.hidden_size, config.num_labels)
 
+        if not config.trainable_encoder:
+            for name, param in self.bert.named_parameters():
+                # Make sure the pooler can keep learning
+                if "pooler" not in name:
+                    param.requires_grad = False
+
         self.init_weights()
 
     def forward(self, input_ids, input_mask=None, targets=None):
