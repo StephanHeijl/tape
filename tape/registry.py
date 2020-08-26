@@ -2,6 +2,7 @@ from typing import Dict, Type, Callable, Optional, Union
 from torch.utils.data import Dataset
 from .models.modeling_utils import ProteinModel
 from pathlib import Path
+import json
 
 PathType = Union[str, Path]
 
@@ -214,7 +215,17 @@ class Registry:
         model_cls = task_spec.get_model(model_name)
 
         if load_dir is not None:
-            model = model_cls.from_pretrained(load_dir, num_labels=task_spec.num_labels)
+            # Allow the configuration file specified on the command line to override
+            # pretrained model settings or set extra settings.
+            if config_file is not None:
+                with open(config_file, "r", encoding='utf-8') as reader:
+                    kwargs = json.load(reader)
+            else:
+                kwargs = {}
+
+            model = model_cls.from_pretrained(
+                load_dir, num_labels=task_spec.num_labels, **kwargs
+            )
         else:
             config_class = model_cls.config_class
             if config_file is not None:

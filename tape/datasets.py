@@ -900,6 +900,44 @@ class MeltingDatasetRegression(Dataset):
                 'input_mask': input_mask, 'targets': targets}  # type: ignore
 
 
+@registry.register_task('fireprot')
+class FireProt(Dataset):
+    def __init__(self,
+                 data_path: Union[str, Path],
+                 split: str,
+                 tokenizer: Union[str, TAPETokenizer] = 'iupac',
+                 in_memory: bool = False):
+        super().__init__()
+
+        data_path = Path(data_path)
+        data_file = split + ".lmdb"
+        data_file = data_path / 'fireprot' / data_file
+
+        if isinstance(tokenizer, str):
+            tokenizer = TAPETokenizer(vocab=tokenizer)
+        self.tokenizer = tokenizer
+        self.data = dataset_factory(data_file)
+
+    def __len__(self) -> int:
+        return len(self.data)
+
+    def __getitem__(self, index: int):
+        item = self.data[index]
+        token_ids = self.tokenizer.encode(item['primary'])
+        input_mask = np.ones_like(token_ids)
+        target = float(item['target'])
+        return item['id'], token_ids, input_mask, target
+
+    def collate_fn(self, batch: List[Tuple[Any, ...]]) -> Dict[str, torch.Tensor]:
+        ids, tokens, input_mask, targets = zip(*batch)
+        ids = list(ids)
+        tokens = torch.from_numpy(pad_sequences(tokens))
+        input_mask = torch.from_numpy(pad_sequences(input_mask))
+        targets = torch.FloatTensor(targets).view(-1, 1)
+        return {'ids': ids, 'input_ids': tokens,
+                'input_mask': input_mask, 'targets': targets}  # type: ignore
+
+
 @registry.register_task('melting_point_classification', num_labels=21)
 class MeltingDatasetClassification(Dataset):
     """ Defines the protein melting point prediction dataset.
@@ -951,6 +989,6 @@ class MeltingDatasetClassification(Dataset):
         targets = pd.cut(targets, np.arange(0, 101, 5))
         targets = np.argmax(pd.get_dummies(targets).values, axis=1)
         targets = torch.LongTensor(targets)
-        #print(targets.shape)
+
         return {'ids': ids, 'input_ids': tokens,
                 'input_mask': input_mask, 'targets': targets}  # type: ignore

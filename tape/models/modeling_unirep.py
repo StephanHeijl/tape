@@ -14,7 +14,6 @@ from ..registry import registry
 
 logger = logging.getLogger(__name__)
 
-
 URL_PREFIX = "https://s3.amazonaws.com/proteindata/pytorch-models/"
 UNIREP_PRETRAINED_CONFIG_ARCHIVE_MAP: typing.Dict[str, str] = {
     'babbler-1900': URL_PREFIX + 'unirep-base-config.json'}
@@ -32,6 +31,8 @@ class UniRepConfig(ProteinConfig):
                  hidden_dropout_prob: float = 0.1,
                  layer_norm_eps: float = 1e-12,
                  initializer_range: float = 0.02,
+                 sequence_chunking_size: float = 0,
+                 sequence_chunking_method: str = None,
                  **kwargs):
         super().__init__(**kwargs)
         self.vocab_size = vocab_size
@@ -40,6 +41,8 @@ class UniRepConfig(ProteinConfig):
         self.hidden_dropout_prob = hidden_dropout_prob
         self.layer_norm_eps = layer_norm_eps
         self.initializer_range = initializer_range
+        self.sequence_chunking_size = sequence_chunking_size
+        self.sequence_chunking_method = sequence_chunking_method
 
 
 class mLSTMCell(nn.Module):
@@ -82,7 +85,8 @@ class mLSTM(nn.Module):
         seqlen = inputs.size(1)
 
         if mask is None:
-            mask = torch.ones(batch_size, seqlen, 1, dtype=inputs.dtype, device=inputs.device)
+            mask = torch.ones(batch_size, seqlen, 1, dtype=inputs.dtype,
+                              device=inputs.device)
         elif mask.dim() == 2:
             mask = mask.unsqueeze(2)
 
@@ -106,7 +110,6 @@ class mLSTM(nn.Module):
 
 
 class UniRepAbstractModel(ProteinModel):
-
     config_class = UniRepConfig
     pretrained_model_archive_map = UNIREP_PRETRAINED_MODEL_ARCHIVE_MAP
     base_model_prefix = "unirep"
@@ -127,7 +130,59 @@ class UniRepModel(UniRepAbstractModel):
         self.embed_matrix = nn.Embedding(config.vocab_size, config.input_size)
         self.encoder = mLSTM(config)
         self.output_hidden_states = config.output_hidden_states
+        self.sequence_chunking_size = config.sequence_chunking_size
+
+        methods = {
+            "sum": torch.sum,
+            "mean": torch.mean,
+            "max": torch.max,
+        }
+
+        self.sequence_chunking_method = methods[config.sequence_chunking_method]
+
         self.init_weights()
+
+    def chunk_sequence(self, embedding_output, input_mask):
+        """ The UniRep model can be very memory-intensive. This method allows a
+        sequence to be split up into parts and run through the network that way. """
+        batch_size, length, _features = embedding_output.shape
+        target_length = self.sequence_chunking_size
+
+        if length % target_length:
+            n_pad = target_length - (length % target_length)
+            # Pad the embeddings to the right
+            embedding_output = nn.functional.pad(
+                embedding_output, (0, 0, 0, n_pad), 'constant', 0
+            )
+            # Pad the input mask to the right
+            input_mask = nn.functional.pad(
+                input_mask, (0, n_pad), 'constant', 0
+            )
+            length = embedding_output.shape[1]
+
+        embedding_output = embedding_output.view(
+            batch_size * (length // target_length), target_length, -1
+        )
+        input_mask = input_mask.view(
+            batch_size * (length // target_length), target_length
+        )
+
+        return embedding_output, input_mask, batch_size
+
+    def combine_sequence(self, encoder_outputs_chunked, original_batch_size):
+        sequence_output, hidden_states = encoder_outputs_chunked
+        target_shape = (original_batch_size, -1, sequence_output.shape[-1])
+        sequence_output = sequence_output.view(target_shape)
+
+        # Combine the hidden states using a given method.
+        hidden_states = [
+            self.sequence_chunking_method(
+                hs.view(original_batch_size, -1, hs.shape[-1]), axis=1
+            )
+            for hs in hidden_states
+        ]
+
+        return sequence_output, hidden_states
 
     def forward(self, input_ids, input_mask=None):
         if input_mask is None:
@@ -137,7 +192,22 @@ class UniRepModel(UniRepAbstractModel):
         input_mask = input_mask.to(dtype=next(self.parameters()).dtype)
         embedding_output = self.embed_matrix(input_ids)
 
-        encoder_outputs = self.encoder(embedding_output, mask=input_mask)
+        if 0 < self.sequence_chunking_size < embedding_output.shape[1]:
+            # If self.sequence_chunking_size exceeds 0 and the current batch has a length
+            # larger than that, use the chunking process.
+            embedding_output_c, input_mask_c, original_batch_size = self.chunk_sequence(
+                embedding_output, input_mask
+            )
+            encoder_outputs_chunked = self.encoder(
+                embedding_output_c, mask=input_mask_c
+            )
+            encoder_outputs = self.combine_sequence(
+                encoder_outputs_chunked, original_batch_size
+            )
+        else:
+            # The regular path, which runs through the entire sequence.
+            encoder_outputs = self.encoder(embedding_output, mask=input_mask)
+
         sequence_output = encoder_outputs[0]
         hidden_states = encoder_outputs[1]
         pooled_outputs = torch.cat(hidden_states, 1)
@@ -162,7 +232,6 @@ class UniRepForLM(UniRepAbstractModel):
                 input_ids,
                 input_mask=None,
                 targets=None):
-
         outputs = self.unirep(input_ids, input_mask=input_mask)
 
         sequence_output, pooled_output = outputs[:2]
@@ -197,7 +266,6 @@ class UniRepForValuePrediction(UniRepAbstractModel):
         self.init_weights()
 
     def forward(self, input_ids, input_mask=None, targets=None):
-
         outputs = self.unirep(input_ids, input_mask=input_mask)
 
         sequence_output, pooled_output = outputs[:2]
@@ -220,7 +288,6 @@ class UniRepForSequenceClassification(UniRepAbstractModel):
         self.init_weights()
 
     def forward(self, input_ids, input_mask=None, targets=None):
-
         outputs = self.unirep(input_ids, input_mask=input_mask)
 
         sequence_output, pooled_output = outputs[:2]
@@ -242,7 +309,6 @@ class UniRepForSequenceToSequenceClassification(UniRepAbstractModel):
         self.init_weights()
 
     def forward(self, input_ids, input_mask=None, targets=None):
-
         outputs = self.unirep(input_ids, input_mask=input_mask)
 
         sequence_output, pooled_output = outputs[:2]
@@ -263,7 +329,6 @@ class UniRepForContactPrediction(UniRepAbstractModel):
         self.init_weights()
 
     def forward(self, input_ids, protein_length, input_mask=None, targets=None):
-
         outputs = self.unirep(input_ids, input_mask=input_mask)
 
         sequence_output, pooled_output = outputs[:2]
