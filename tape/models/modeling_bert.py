@@ -373,6 +373,7 @@ class ProteinBertPooler(nn.Module):
         # We "pool" the model by simply taking the hidden state corresponding
         # to the first token.
         first_token_tensor = hidden_states[:, 0]
+
         pooled_output = self.dense(first_token_tensor)
         pooled_output = self.activation(pooled_output)
         return pooled_output
@@ -449,7 +450,14 @@ class ProteinBertModel(ProteinBertAbstractModel):
         encoder_outputs = self.encoder(embedding_output,
                                        extended_attention_mask,
                                        chunks=None)
+        # This is a good choice if the whole model is being fine-tuned, but a poor choice
+        # when no finetuning takes place
+        # https://bert-as-service.readthedocs.io/en/latest/section/faq.html#so-which-layer-and-which-pooling-strategy-is-the-best
         sequence_output = encoder_outputs[0]
+        if len(encoder_outputs) > 1:
+            # Use the second to last layer for more "generic" embeddings
+            sequence_output = encoder_outputs[1][-2]
+
         pooled_output = self.pooler(sequence_output)
 
         # add hidden_states and attentions if they are here
@@ -495,6 +503,7 @@ class ProteinBertForMaskedLM(ProteinBertAbstractModel):
 @registry.register_task_model('fluorescence', 'transformer')
 @registry.register_task_model('stability', 'transformer')
 @registry.register_task_model('melting_point_regression', 'transformer')
+@registry.register_task_model('fireprot', 'transformer')
 class ProteinBertForValuePrediction(ProteinBertAbstractModel):
 
     def __init__(self, config):
