@@ -125,14 +125,18 @@ class BackwardRunner(ForwardRunner):
                  local_rank: int = -1,
                  max_grad_norm: float = 1.0,
                  warmup_steps: int = 0,
-                 num_train_optimization_steps: int = 1000000):
+                 num_train_optimization_steps: int = 1000000,
+                 no_cuda: bool = False):
 
         super().__init__(model, device, n_gpu, fp16, local_rank)
         self.optimizer = optimizer
         self.max_grad_norm = max_grad_norm
         self._global_step = 0
         self._local_rank = local_rank
-        self._overflow_buf = torch.cuda.IntTensor([0])  # type: ignore
+        self._overflow_buf = torch.IntTensor([0])  # type: ignore
+        if not no_cuda:
+            self._overflow_buf = self._overflow_buf.cuda()
+
         self.gradient_accumulation_steps = gradient_accumulation_steps
         self._delay_accumulation = fp16 and local_rank != -1
 
@@ -464,7 +468,7 @@ def run_train(model_type: str,
 
     runner = BackwardRunner(
         model, optimizer, gradient_accumulation_steps, device, n_gpu,
-        fp16, local_rank, max_grad_norm, warmup_steps, num_train_optimization_steps)
+        fp16, local_rank, max_grad_norm, warmup_steps, num_train_optimization_steps, no_cuda)
 
     runner.initialize_fp16()
     if resume_from_checkpoint:

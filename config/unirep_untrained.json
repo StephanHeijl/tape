@@ -1,0 +1,5 @@
+{
+  "sequence_chunking_size": 2048,
+  "sequence_chunking_method": "mean",
+  "trainable_encoder": false
+}

@@ -791,7 +791,7 @@ class MLMHead(nn.Module):
 class ValuePredictionHead(nn.Module):
     def __init__(self, hidden_size: int, dropout: float = 0.):
         super().__init__()
-        self.value_prediction = SimpleMLP(hidden_size, 512, 1, dropout)
+        self.value_prediction = SimpleMLP(hidden_size, 1024, 1, dropout)
 
     def forward(self, pooled_output, targets=None):
         value_pred = self.value_prediction(pooled_output)
@@ -810,7 +810,7 @@ class ValuePredictionHead(nn.Module):
 class SequenceClassificationHead(nn.Module):
     def __init__(self, hidden_size: int, num_labels: int):
         super().__init__()
-        self.classify = SimpleMLP(hidden_size, 512, num_labels)
+        self.classify = SimpleMLP(hidden_size, 1024, num_labels)
 
     def forward(self, pooled_output, targets=None):
         logits = self.classify(pooled_output)

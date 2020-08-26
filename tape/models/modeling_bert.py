@@ -93,6 +93,7 @@ class ProteinBertConfig(ProteinConfig):
                  type_vocab_size: int = 2,
                  initializer_range: float = 0.02,
                  layer_norm_eps: float = 1e-12,
+                 trainable_encoder: bool = True,
                  **kwargs):
         super().__init__(**kwargs)
         self.vocab_size = vocab_size
@@ -107,6 +108,7 @@ class ProteinBertConfig(ProteinConfig):
         self.type_vocab_size = type_vocab_size
         self.initializer_range = initializer_range
         self.layer_norm_eps = layer_norm_eps
+        self.trainable_encoder = trainable_encoder
 
 
 class ProteinBertEmbeddings(nn.Module):
@@ -501,6 +503,12 @@ class ProteinBertForValuePrediction(ProteinBertAbstractModel):
         self.bert = ProteinBertModel(config)
         self.predict = ValuePredictionHead(config.hidden_size)
 
+        if not config.trainable_encoder:
+            for name, param in self.bert.named_parameters():
+                # Make sure the pooler can keep learning
+                if "pooler" not in name:
+                    param.requires_grad = False
+
         self.init_weights()
 
     def forward(self, input_ids, input_mask=None, targets=None):
@@ -523,6 +531,12 @@ class ProteinBertForSequenceClassification(ProteinBertAbstractModel):
         self.bert = ProteinBertModel(config)
         self.classify = SequenceClassificationHead(
             config.hidden_size, config.num_labels)
+
+        if not config.trainable_encoder:
+            for name, param in self.bert.named_parameters():
+                # Make sure the pooler can keep learning
+                if "pooler" not in name:
+                    param.requires_grad = False
 
         self.init_weights()
 
