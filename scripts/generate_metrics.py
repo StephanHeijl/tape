@@ -59,23 +59,24 @@ def get_stats(fname, real_valid_values):
 
 
 TAPE_DIR = "/home/sheijl/tape-rq/tape"
-MODELS_DIR = f"{TAPE_DIR}/bert_melting_point_regr/"
-TAPE_EVAL = "/home/sheijl/.local/bin/tape-eval"
-models = pandas.read_csv("/home/sheijl/Documents/models.csv").dropna()
+if not os.path.exists(TAPE_DIR):
+    TAPE_DIR = "/home/sheijl/tape"
+MODELS_DIR = f"{TAPE_DIR}/melting_point_regr_mmseq_2"
+TAPE_EVAL = "tape-eval"
+if not os.path.exists(TAPE_EVAL):
+    TAPE_EVAL = "tape-eval"
+models = pandas.read_csv("/home/sheijl/Documents/models_chiba.csv").dropna()
 
 
 def main(split="test"):
     real_valid_values = load_real_values(os.path.join(TAPE_DIR, "data/melting_temps/%s.lmdb" % split))
 
     # Generate varibench test results
-    command = "cd {tape_dir}; {tape_eval} {model_type} melting_point_{prediction_type} bert_melting_point_regr/{run_name} " \
-              "--tokenizer {tokenizer} --split %s --batch_size 1 --num_workers 0" % split
+    command = "cd {tape_dir}; {tape_eval} {model_type} melting_point_{prediction_type} {models_dir}/{run_name} " \
+              "--tokenizer {tokenizer} --split %s --batch_size 1 --num_workers 0 --no_cuda" % split
 
     for r, row in models.iterrows():
-        if row.identity != 90:
-            continue
-
-        if not os.path.exists(os.path.join(TAPE_DIR, "bert_melting_point_regr", row.run_name, "pytorch_model.bin")):
+        if not os.path.exists(os.path.join(TAPE_DIR, MODELS_DIR, row.run_name, "pytorch_model.bin")):
             print(f"Run name {row.run_name} not available.")
             continue
 
@@ -84,21 +85,22 @@ def main(split="test"):
         else:
             tokenizer = "iupac"
 
-
         cmd = command.format(
             tape_dir=TAPE_DIR,
             tape_eval=TAPE_EVAL,
             prediction_type=row.prediction_type,
+            models_dir=MODELS_DIR,
             run_name=row.run_name,
             model_type=row.model_type.split("_")[0].lower(),
             tokenizer=tokenizer
         )
+        print(cmd)
 
         try:
             results = get_stats(os.path.join(MODELS_DIR, row.run_name, "results.pkl"), real_valid_values)
         except (KeyError, FileNotFoundError):
-            process = subprocess.Popen(cmd, shell=True)
-            process.communicate()
+            process = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE)
+            print(process.communicate())
             results = get_stats(os.path.join(MODELS_DIR, row.run_name, "results.pkl"), real_valid_values)
 
         results_dict = {

@@ -98,6 +98,7 @@ class mLSTM(nn.Module):
             state = (zeros, zeros)
 
         steps = []
+        
         for seq in range(seqlen):
             prev = state
             seq_input = inputs[:, seq, :]

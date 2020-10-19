@@ -366,15 +366,25 @@ class ProteinBertEncoder(nn.Module):
 class ProteinBertPooler(nn.Module):
     def __init__(self, config):
         super().__init__()
-        self.dense = nn.Linear(config.hidden_size, config.hidden_size)
+        self.trainable_encoder = config.trainable_encoder
+        if self.trainable_encoder:
+            self.dense = nn.Linear(config.hidden_size, config.hidden_size)
+        else:
+            # Get three layers at the same time
+            self.dense = nn.Linear(config.hidden_size, config.hidden_size)
         self.activation = nn.Tanh()
 
     def forward(self, hidden_states):
-        # We "pool" the model by simply taking the hidden state corresponding
-        # to the first token.
-        first_token_tensor = hidden_states[:, 0]
+        if self.trainable_encoder:
+            # We "pool" the model by simply taking the hidden state corresponding
+            # to the first token.
+            first_token_tensor = hidden_states[:, 0]
+            pooled_output = self.dense(first_token_tensor)
+        else:
+            # We "pool" the model by mean hidden state
+            mean_token_tensor = hidden_states.mean(dim=1)
+            pooled_output = self.dense(mean_token_tensor)
 
-        pooled_output = self.dense(first_token_tensor)
         pooled_output = self.activation(pooled_output)
         return pooled_output
 
@@ -455,8 +465,7 @@ class ProteinBertModel(ProteinBertAbstractModel):
         # https://bert-as-service.readthedocs.io/en/latest/section/faq.html#so-which-layer-and-which-pooling-strategy-is-the-best
         sequence_output = encoder_outputs[0]
         if len(encoder_outputs) > 1:
-            # Use the second to last layer for more "generic" embeddings
-            sequence_output = encoder_outputs[1][-2]
+            sequence_output = encoder_outputs[1][-1]
 
         pooled_output = self.pooler(sequence_output)
 
