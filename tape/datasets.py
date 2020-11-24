@@ -437,6 +437,7 @@ class FluorescenceDataset(Dataset):
         if split not in ('train', 'valid', 'test'):
             raise ValueError(f"Unrecognized split: {split}. "
                              f"Must be one of ['train', 'valid', 'test']")
+
         if isinstance(tokenizer, str):
             tokenizer = TAPETokenizer(vocab=tokenizer)
         self.tokenizer = tokenizer
