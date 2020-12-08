@@ -192,7 +192,7 @@ class TransformerTokenizer(TAPETokenizer):
 
     def __init__(self, vocab: Union[PreTrainedTokenizer, str]):
         if isinstance(vocab, str):
-            self.transformer_tokenizer = AutoTokenizer.from_pretrained(vocab)
+            self.transformer_tokenizer = AutoTokenizer.from_pretrained(vocab, do_lower_case=False)
         else:
             self.transformer_tokenizer = vocab
 

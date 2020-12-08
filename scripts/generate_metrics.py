@@ -17,11 +17,9 @@ def load_real_values(lmdb_filename):
 def get_stats(fname, real_valid_values):
     with open(fname, "rb") as f:
         data = pickle.load(f)
-
     df = pandas.DataFrame(data[1])
     preds = np.array(df.prediction.tolist())
     targets = np.array(df.target.tolist())
-
     if preds.shape[1] > 1:
         # Classification mode
         soft_targets = np.array([real_valid_values[item['id']] for item in data[1]])
@@ -30,13 +28,11 @@ def get_stats(fname, real_valid_values):
         epred_sums = epreds.sum(axis=1)
         epreds = (epreds.T / epred_sums).T
         epreds_f = (epreds * np.arange(0, 101, 5)).sum(axis=1)
-
         full_r = pearsonr(epreds_f, soft_targets)
         full_mae = mean_absolute_error(soft_targets, epreds_f)
         melters_r = pearsonr(epreds_f[targets < 19], soft_targets[targets < 19])
         melters_mae = mean_absolute_error(soft_targets[targets < 19], epreds_f[targets < 19])
         melters_f1 = f1_score(targets >= 19, preds_i >= 19)
-
     else:
         # Regression mode
         preds = preds.flatten()
@@ -45,16 +41,13 @@ def get_stats(fname, real_valid_values):
         #         pandas.Series(preds).hist()
         #         plt.show()
         #         pandas.Series(targets).hist()
-
         targets = np.array([real_valid_values[item['id']] for item in data[1]])
-
         preds = np.clip(np.exp(preds * 0.2 + 3.7), 0, 100)
         full_r = pearsonr(preds, targets)
         full_mae = mean_absolute_error(targets, preds)
         melters_r = pearsonr(preds[targets < 99], targets[targets < 99])
         melters_mae = mean_absolute_error(targets[targets < 99], preds[targets < 99])
         melters_f1 = f1_score(targets >= 99, preds >= 99)
-
     return full_r[0], full_mae, melters_r[0], melters_mae, melters_f1
 
 

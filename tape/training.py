@@ -365,7 +365,7 @@ def _get_outputs_to_save(batch, outputs):
         target = target[output_slices]
 
         reshaped_output.append((target, output))
-    reshaped_output
+    return reshaped_output
 
 
 def run_eval_epoch(eval_loader: DataLoader,
@@ -384,11 +384,15 @@ def run_eval_epoch(eval_loader: DataLoader,
         try:
             ids = batch['ids']
         except Exception as e:
-            ids = []
-            raise e
+            ids = None
+            #raise e
 
-        for pred, target, id in zip(predictions, targets, ids):
-            save_outputs.append({'prediction': pred, 'target': target, 'id': id})
+        if ids:
+            for pred, target, id in zip(predictions, targets, ids):
+                save_outputs.append({'prediction': pred, 'target': target, 'id': id})
+        else:
+            for pred, target in zip(predictions, targets):
+                save_outputs.append({'prediction': pred, 'target': target})
 
     return save_outputs
 

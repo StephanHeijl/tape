@@ -465,7 +465,7 @@ class ProteinBertModel(ProteinBertAbstractModel):
                                        extended_attention_mask,
                                        chunks=None)
         # This is a good choice if the whole model is being fine-tuned, but a poor choice
-        # when no finetuning takes place
+        # when no fine-tuning takes place
         # https://bert-as-service.readthedocs.io/en/latest/section/faq.html#so-which-layer-and-which-pooling-strategy-is-the-best
         sequence_output = encoder_outputs[0]
         if len(encoder_outputs) > 1:

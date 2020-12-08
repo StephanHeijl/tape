@@ -96,20 +96,54 @@ class ProteinBFDAbstractModel(ProteinModel):
         pass
 
 
+class ProteinBFDPooler(nn.Module):
+    def __init__(self, config):
+        super().__init__()
+        self.trainable_encoder = config.trainable_encoder
+        if self.trainable_encoder:
+            self.dense = nn.Linear(config.hidden_size, config.hidden_size)
+        else:
+            self.dense = nn.Linear(config.hidden_size, config.hidden_size)
+        self.activation = nn.Tanh()
+
+    def forward(self, hidden_states, attention_mask=None):
+        if self.trainable_encoder:
+            # We "pool" the model by simply taking the hidden state corresponding
+            # to the first token.
+            first_token_tensor = hidden_states[:, 0]
+            pooled_output = self.dense(first_token_tensor)
+        else:
+            if attention_mask is None:
+                attention_mask = torch.ones(hidden_states.shape[:-1])
+            # We "pool" the model by mean hidden state
+            # We use the attention mask to hide hidden states that do not correspond to a token.
+            div_tensor = attention_mask.float().unsqueeze(-1)
+            sum_token_tensor = (hidden_states * div_tensor).sum(dim=1)
+            mean_token_tensor = sum_token_tensor / div_tensor.sum(dim=1)
+
+            pooled_output = self.dense(mean_token_tensor)
+
+        pooled_output = self.activation(pooled_output)
+        return pooled_output
+
+
 @registry.register_task_model('embed', 'prottrans')
 class ProteinBFDModel(ProteinBFDAbstractModel):
 
     def __init__(self, config):
         super().__init__(config)
         self.model = BertModel.from_pretrained("Rostlab/prot_bert")
+        self.pooler_tape = ProteinBFDPooler(config)
 
     def forward(self, input_ids, input_mask=None):
-        h = self.model(input_ids)
-        return h
+        outputs = self.model(input_ids)
+        sequence_output, _native_pooled_output = outputs[:2]
+        pooled_output = self.pooler_tape(sequence_output, input_mask)
+        return (sequence_output, pooled_output) + outputs[2:]
 
 
 @registry.register_task_model('masked_language_modeling', 'prottrans')
-class ProteinBertForMaskedLM(ProteinBFDAbstractModel):
+class ProteinBFDForMaskedLM(ProteinBFDAbstractModel):
 
     def __init__(self, config):
         super().__init__(config)
@@ -158,7 +192,7 @@ class ProteinBertForValuePrediction(ProteinBFDAbstractModel):
         if not config.trainable_encoder:
             for name, param in self.bert.named_parameters():
                 # Make sure the pooler can keep learning
-                if "pooler" not in name:
+                if "pooler_tape" not in name:
                     param.requires_grad = False
 
         self.init_weights()
@@ -187,15 +221,13 @@ class ProteinBertForSequenceClassification(ProteinBFDAbstractModel):
         if not config.trainable_encoder:
             for name, param in self.bert.named_parameters():
                 # Make sure the pooler can keep learning
-                if "pooler" not in name:
+                if "pooler_tape" not in name:
                     param.requires_grad = False
 
         self.init_weights()
 
     def forward(self, input_ids, input_mask=None, targets=None):
-
         outputs = self.bert(input_ids, input_mask=input_mask)
-
         sequence_output, pooled_output = outputs[:2]
 
         outputs = self.classify(pooled_output, targets) + outputs[2:]

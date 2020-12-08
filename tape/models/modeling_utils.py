@@ -30,6 +30,9 @@ import torch
 from torch import nn
 import torch.nn.functional as F
 
+from scipy.stats import pearsonr as sp_pearsonr
+from scipy.stats import spearmanr as sp_spearmanr
+
 from .file_utils import cached_path
 
 CONFIG_NAME = "config.json"
@@ -630,13 +633,20 @@ def accuracy(logits, labels, ignore_index: int = -100):
         return correct.sum().float() / valid_mask.sum().float()
 
 
-def pearsonr(predictions, targets):
+def pearsonr(x, y):
     with torch.no_grad():
-        p_dm = (predictions - predictions.mean())
-        t_dm = (targets - targets.mean())
-        num = (p_dm * t_dm).sum()
-        denom = ((p_dm ** 2).sum() ** 0.5) * ((t_dm ** 2).sum() ** 0.5)
-        return num / (denom + 1e-6)
+        try:
+            return sp_pearsonr(x.cpu().numpy().flatten(), y.cpu().numpy().flatten())[0]
+        except:
+            return 0
+
+
+def spearmanr(x, y):
+    with torch.no_grad():
+        try:
+            return sp_spearmanr(x.cpu().numpy().flatten(), y.cpu().numpy().flatten())[0]
+        except:
+            return 0
 
 
 def gelu(x):
@@ -802,7 +812,10 @@ class ValuePredictionHead(nn.Module):
             loss_fct = nn.MSELoss()
             value_pred_loss = loss_fct(value_pred, targets)
             # You need a batch size that exceeds 1 or it will always be 0.
-            metrics = {'pearsonr': pearsonr(value_pred, targets)}
+            metrics = {
+                'pearsonr': pearsonr(value_pred, targets),
+                'spearmanr': spearmanr(value_pred, targets)
+            }
             loss_and_metrics = (value_pred_loss, metrics)
             outputs = (loss_and_metrics, ) + outputs
         return outputs  # (loss), value_prediction
