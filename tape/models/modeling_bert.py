@@ -476,7 +476,7 @@ class ProteinBertModel(ProteinBertAbstractModel):
         if len(encoder_outputs) > 1:
             sequence_output = encoder_outputs[1][-1]
 
-        pooled_output = self.pooler(sequence_output, input_ids)
+        pooled_output = self.pooler(sequence_output, input_mask)
 
         # add hidden_states and attentions if they are here
         outputs = (sequence_output, pooled_output,) + encoder_outputs[1:]
