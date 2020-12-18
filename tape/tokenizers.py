@@ -2,6 +2,9 @@ from typing import List
 import logging
 from collections import OrderedDict
 import numpy as np
+from typing import Union
+
+from transformers import AutoTokenizer, PreTrainedTokenizer
 
 logger = logging.getLogger(__name__)
 
@@ -95,9 +98,15 @@ UNIREP_VOCAB = OrderedDict([
     ("<sep>", 25)])
 
 
-class TAPETokenizer():
+class TAPETokenizer(object):
     r"""TAPE Tokenizer. Can use different vocabs depending on the model.
     """
+
+    def __new__(cls, vocab: str = "iupac"):
+        if vocab in ["iupac", "unirep"]:
+            return super(TAPETokenizer, cls).__new__(cls)
+        else:
+            return TransformerTokenizer(vocab)
 
     def __init__(self, vocab: str = 'iupac'):
         if vocab == 'iupac':
@@ -168,6 +177,64 @@ class TAPETokenizer():
         tokens = self.add_special_tokens(tokens)
         token_ids = self.convert_tokens_to_ids(tokens)
         return np.array(token_ids, np.int64)
+
+    @classmethod
+    def from_pretrained(cls, **kwargs):
+        return cls()
+
+
+class TransformerTokenizer(TAPETokenizer):
+    """ This class wraps the generic PreTrainedTokenizer from Huggingface's transformers
+    library for use with ProtTrans. """
+
+    def __new__(cls, transformer_tokenizer):
+        return super(TransformerTokenizer, cls).__new__(cls)
+
+    def __init__(self, vocab: Union[PreTrainedTokenizer, str]):
+        if isinstance(vocab, str):
+            self.transformer_tokenizer = AutoTokenizer.from_pretrained(vocab, do_lower_case=False)
+        else:
+            self.transformer_tokenizer = vocab
+
+    def vocab_size(self) -> int:
+        return self.transformer_tokenizer.vocab_size
+
+    def start_token(self) -> str:
+        return self.transformer_tokenizer.cls_token
+
+    def stop_token(self) -> str:
+        return self.transformer_tokenizer.sep_token
+
+    def mask_token(self) -> str:
+        return self.transformer_tokenizer.mask_token
+
+    def tokenize(self, text: str) -> List[str]:
+        text = " ".join(list(text))
+        return self.transformer_tokenizer.tokenize(text)
+
+    def convert_token_to_id(self, token: str) -> int:
+        return self.transformer_tokenizer.convert_tokens_to_ids(token)[0]
+
+    def convert_tokens_to_ids(self, tokens: List[str]) -> List[int]:
+        return self.transformer_tokenizer.convert_tokens_to_ids(tokens)
+
+    def convert_id_to_token(self, index: int) -> str:
+        return self.transformer_tokenizer.convert_ids_to_tokens(index)[0]
+
+    def convert_ids_to_tokens(self, indices: List[int]) -> List[str]:
+        return self.transformer_tokenizer.convert_ids_to_tokens(indices)
+
+    def convert_tokens_to_string(self, tokens: str) -> str:
+        return self.transformer_tokenizer.convert_tokens_to_string(tokens)
+
+    def add_special_tokens(self, token_ids: List[str]) -> List[str]:
+        return self.transformer_tokenizer.build_inputs_with_special_tokens(token_ids)
+
+    def encode(self, text: str) -> np.ndarray:
+        # `" ".join(list(text))` is required for this tokenizer, it avoids the
+        # byte pair encoding that is default for Huggingface BERT tokenizers.
+        # Just adding the full sequence will result in a single <UNK> token.
+        return np.array(self.transformer_tokenizer.encode(" ".join(list(text))))
 
     @classmethod
     def from_pretrained(cls, **kwargs):

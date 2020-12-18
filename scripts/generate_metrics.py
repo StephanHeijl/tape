@@ -17,11 +17,9 @@ def load_real_values(lmdb_filename):
 def get_stats(fname, real_valid_values):
     with open(fname, "rb") as f:
         data = pickle.load(f)
-
     df = pandas.DataFrame(data[1])
     preds = np.array(df.prediction.tolist())
     targets = np.array(df.target.tolist())
-
     if preds.shape[1] > 1:
         # Classification mode
         soft_targets = np.array([real_valid_values[item['id']] for item in data[1]])
@@ -30,13 +28,11 @@ def get_stats(fname, real_valid_values):
         epred_sums = epreds.sum(axis=1)
         epreds = (epreds.T / epred_sums).T
         epreds_f = (epreds * np.arange(0, 101, 5)).sum(axis=1)
-
         full_r = pearsonr(epreds_f, soft_targets)
         full_mae = mean_absolute_error(soft_targets, epreds_f)
         melters_r = pearsonr(epreds_f[targets < 19], soft_targets[targets < 19])
         melters_mae = mean_absolute_error(soft_targets[targets < 19], epreds_f[targets < 19])
         melters_f1 = f1_score(targets >= 19, preds_i >= 19)
-
     else:
         # Regression mode
         preds = preds.flatten()
@@ -45,16 +41,13 @@ def get_stats(fname, real_valid_values):
         #         pandas.Series(preds).hist()
         #         plt.show()
         #         pandas.Series(targets).hist()
-
         targets = np.array([real_valid_values[item['id']] for item in data[1]])
-
         preds = np.clip(np.exp(preds * 0.2 + 3.7), 0, 100)
         full_r = pearsonr(preds, targets)
         full_mae = mean_absolute_error(targets, preds)
         melters_r = pearsonr(preds[targets < 99], targets[targets < 99])
         melters_mae = mean_absolute_error(targets[targets < 99], preds[targets < 99])
         melters_f1 = f1_score(targets >= 99, preds >= 99)
-
     return full_r[0], full_mae, melters_r[0], melters_mae, melters_f1
 
 
@@ -65,7 +58,8 @@ MODELS_DIR = f"{TAPE_DIR}/melting_point_regr_mmseq_2"
 TAPE_EVAL = "tape-eval"
 if not os.path.exists(TAPE_EVAL):
     TAPE_EVAL = "tape-eval"
-models = pandas.read_csv("/home/sheijl/Documents/models_chiba.csv").dropna()
+#models = pandas.read_csv("/home/sheijl/Documents/models_chiba.csv").dropna()
+models = pandas.read_csv("/home/sheijl/Documents/models_rq.csv").dropna()
 
 
 def main(split="test"):
@@ -73,7 +67,7 @@ def main(split="test"):
 
     # Generate varibench test results
     command = "cd {tape_dir}; {tape_eval} {model_type} melting_point_{prediction_type} {models_dir}/{run_name} " \
-              "--tokenizer {tokenizer} --split %s --batch_size 1 --num_workers 0 --no_cuda" % split
+              "--tokenizer {tokenizer} --split %s --batch_size 1 --num_workers 0" % split
 
     for r, row in models.iterrows():
         if not os.path.exists(os.path.join(TAPE_DIR, MODELS_DIR, row.run_name, "pytorch_model.bin")):

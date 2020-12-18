@@ -135,11 +135,15 @@ class ProteinBertEmbeddings(nn.Module):
         if token_type_ids is None:
             token_type_ids = torch.zeros_like(input_ids)
 
-        words_embeddings = self.word_embeddings(input_ids)
-        position_embeddings = self.position_embeddings(position_ids)
-        token_type_embeddings = self.token_type_embeddings(token_type_ids)
+        try:
+            words_embeddings = self.word_embeddings(input_ids)
+            position_embeddings = self.position_embeddings(position_ids)
+            token_type_embeddings = self.token_type_embeddings(token_type_ids)
 
-        embeddings = words_embeddings + position_embeddings + token_type_embeddings
+            embeddings = words_embeddings + position_embeddings + token_type_embeddings
+        except:
+            print(input_ids.max())
+            exit()
         embeddings = self.LayerNorm(embeddings)
         embeddings = self.dropout(embeddings)
         return embeddings
@@ -370,19 +374,24 @@ class ProteinBertPooler(nn.Module):
         if self.trainable_encoder:
             self.dense = nn.Linear(config.hidden_size, config.hidden_size)
         else:
-            # Get three layers at the same time
             self.dense = nn.Linear(config.hidden_size, config.hidden_size)
         self.activation = nn.Tanh()
 
-    def forward(self, hidden_states):
+    def forward(self, hidden_states, attention_mask=None):
         if self.trainable_encoder:
             # We "pool" the model by simply taking the hidden state corresponding
             # to the first token.
             first_token_tensor = hidden_states[:, 0]
             pooled_output = self.dense(first_token_tensor)
         else:
+            if attention_mask is None:
+                attention_mask = torch.ones(hidden_states.shape[:-1])
             # We "pool" the model by mean hidden state
-            mean_token_tensor = hidden_states.mean(dim=1)
+            # We use the attention mask to hide hidden states that do not correspond to a token.
+            div_tensor = attention_mask.float().unsqueeze(-1)
+            sum_token_tensor = (hidden_states * div_tensor).sum(dim=1)
+            mean_token_tensor = sum_token_tensor / div_tensor.sum(dim=1)
+
             pooled_output = self.dense(mean_token_tensor)
 
         pooled_output = self.activation(pooled_output)
@@ -461,13 +470,13 @@ class ProteinBertModel(ProteinBertAbstractModel):
                                        extended_attention_mask,
                                        chunks=None)
         # This is a good choice if the whole model is being fine-tuned, but a poor choice
-        # when no finetuning takes place
+        # when no fine-tuning takes place
         # https://bert-as-service.readthedocs.io/en/latest/section/faq.html#so-which-layer-and-which-pooling-strategy-is-the-best
         sequence_output = encoder_outputs[0]
         if len(encoder_outputs) > 1:
             sequence_output = encoder_outputs[1][-1]
 
-        pooled_output = self.pooler(sequence_output)
+        pooled_output = self.pooler(sequence_output, input_mask)
 
         # add hidden_states and attentions if they are here
         outputs = (sequence_output, pooled_output,) + encoder_outputs[1:]
